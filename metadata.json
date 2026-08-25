@@ -1,0 +1,6 @@
+{
+  "name": "GnuGuard",
+  "description": "Minimal and professional Wi-Fi scanner and local network device discovery tool with security diagnostics, detail inspection, biometric protection, and battery-optimized coroutine scanning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
