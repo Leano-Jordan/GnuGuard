@@ -11,7 +11,7 @@ jobs:
   health-report:
     runs-on: ubuntu-latest
     env:
-      DIRECTOR: "UNASSIGNED"
+      DIRECTOR: "Gnu"
       REPOSITORY: "${{ github.repository }}"
       COMMIT_SHA: "${{ github.sha }}"
       BRANCH: "${{ github.ref_name }}"
@@ -55,6 +55,9 @@ jobs:
                   "composer_json": exists("composer.json"),
                   "requirements": exists("requirements.txt") or exists("pyproject.toml"),
                   "github_actions": exists(".github/workflows"),
+                  "android_gradle": exists("gradlew") or exists("gradlew.bat"),
+                  "android_manifest": exists("app/src/main/AndroidManifest.xml"),
+                  "kotlin_source": exists("app/src/main/java") or exists("app/src/main/kotlin"),
                   "tests_directory": exists("tests") or exists("test"),
                   "readme": exists("README.md"),
               },
