@@ -87,7 +87,7 @@ class WifiScanner(private val context: Context) {
             }
 
             CurrentNetworkInfo(
-                isConnectedToWifi = isWifi || ipStr != null,
+                isConnectedToWifi = isWifi,
                 ssid = ssid,
                 bssid = bssid,
                 localIpAddress = ipStr,
