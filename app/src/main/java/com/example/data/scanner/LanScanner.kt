@@ -97,16 +97,16 @@ class LanScanner(private val context: Context) {
         val foundDevices = ConcurrentHashMap<String, LanDevice>()
         val arpTable = readArpTable()
 
-        val localIp = networkInfo.localIpAddress ?: "192.168.1.105"
-        val gatewayIp = networkInfo.gatewayIp ?: "192.168.1.1"
+        val localIp = networkInfo.localIpAddress ?: return@withContext emptyList()
+        val gatewayIp = networkInfo.gatewayIp
 
         // Calculate Subnet prefix (e.g. 192.168.1)
         val ipParts = localIp.split(".")
-        if (ipParts.size != 4) {
-            return@withContext getFallbackDevices(localIp, gatewayIp)
+        if (ipParts.size != 4 || ipParts.any { it.toIntOrNull()?.let { octet -> octet in 0..255 } != true }) {
+            return@withContext emptyList()
         }
         val subnetPrefix = "${ipParts[0]}.${ipParts[1]}.${ipParts[2]}"
-        val myLastOctet = ipParts[3].toIntOrNull() ?: 100
+        val myLastOctet = ipParts[3].toInt()
 
         // Always register Self
         val selfDevice = LanDevice(
@@ -115,10 +115,8 @@ class LanScanner(private val context: Context) {
             macAddress = "Self (Device Protected)",
             hostName = "This Android Device",
             deviceType = DeviceType.PHONE,
-            discoveredServices = listOf(
-                DiscoveredService("GnuGuard Scanner Node", "_gnuguard._tcp.", 5353)
-            ),
-            responseTimeMs = 1L,
+            discoveredServices = emptyList(),
+            responseTimeMs = 0L,
             isReachable = true,
             isGateway = false,
             isSelf = true,
@@ -126,27 +124,26 @@ class LanScanner(private val context: Context) {
         )
         foundDevices[localIp] = selfDevice
 
-        // Always probe Gateway directly
-        val gatewayHost = resolveHost(gatewayIp) ?: "Gateway Router"
-        val gwDevice = LanDevice(
-            id = gatewayIp,
-            ipAddress = gatewayIp,
-            macAddress = arpTable[gatewayIp] ?: "00:1E:E5:8B:2A:01",
-            hostName = gatewayHost,
-            deviceType = DeviceType.ROUTER_GATEWAY,
-            discoveredServices = listOf(
-                DiscoveredService("Web Gateway Admin", "_http._tcp.", 80)
-            ),
-            openPorts = listOf(80, 443, 53),
-            responseTimeMs = 2L,
-            isReachable = true,
-            isGateway = true,
-            isSelf = false,
-            vendor = NetworkUtils.inferVendor(gatewayHost, emptyList()) ?: "Router Gateway"
-        )
-        foundDevices[gatewayIp] = gwDevice
+        // The configured gateway address is known, but reachability and services are not.
+        if (gatewayIp != null && gatewayIp.split(".").size == 4) {
+            foundDevices[gatewayIp] = LanDevice(
+                id = gatewayIp,
+                ipAddress = gatewayIp,
+                macAddress = arpTable[gatewayIp],
+                hostName = resolveHost(gatewayIp),
+                deviceType = DeviceType.ROUTER_GATEWAY,
+                discoveredServices = emptyList(),
+                openPorts = emptyList(),
+                responseTimeMs = 0L,
+                isReachable = false,
+                isGateway = true,
+                isSelf = false,
+                vendor = null
+            )
+        }
 
-        val ipsToScan = (1..254).filter { it != myLastOctet && it != (gatewayIp.split(".").lastOrNull()?.toIntOrNull() ?: 1) }
+        val gatewayLastOctet = gatewayIp?.split(".")?.lastOrNull()?.toIntOrNull()
+        val ipsToScan = (1..254).filter { it != myLastOctet && it != gatewayLastOctet }
         val totalIps = ipsToScan.size
 
         // Batch scan in chunks of 24 to preserve battery and respect Android threading limits
@@ -212,16 +209,6 @@ class LanScanner(private val context: Context) {
             }
         }
 
-        // If very few devices found (e.g. isolated test network or emulator), add realistic LAN peers
-        if (foundDevices.size <= 2) {
-            val fallbacks = getFallbackDevices(localIp, gatewayIp)
-            for (f in fallbacks) {
-                if (!foundDevices.containsKey(f.ipAddress)) {
-                    foundDevices[f.ipAddress] = f
-                }
-            }
-        }
-
         foundDevices.values.sortedWith(
             compareByDescending<LanDevice> { it.isSelf }
                 .thenByDescending { it.isGateway }
@@ -271,12 +258,12 @@ class LanScanner(private val context: Context) {
             id = ip,
             ipAddress = ip,
             macAddress = mac ?: "Privacy Protected (Android 10+)",
-            hostName = hostname ?: if (deviceType == DeviceType.PHONE) "Nearby Smartphone" else null,
+            hostName = hostname,
             deviceType = deviceType,
             discoveredServices = services,
             openPorts = openPorts,
             responseTimeMs = rtt,
-            isReachable = true,
+            isReachable = reachable,
             isGateway = false,
             isSelf = false,
             vendor = vendor
@@ -324,108 +311,4 @@ class LanScanner(private val context: Context) {
                 parts[3].toLong()
     }
 
-    private fun getFallbackDevices(localIp: String, gatewayIp: String): List<LanDevice> {
-        val prefix = localIp.substringBeforeLast(".")
-        return listOf(
-            LanDevice(
-                id = "$prefix.1",
-                ipAddress = "$prefix.1",
-                macAddress = "34:2C:C4:8A:19:A0",
-                hostName = "router.local",
-                deviceType = DeviceType.ROUTER_GATEWAY,
-                discoveredServices = listOf(
-                    DiscoveredService("Asus-RT-AX88U", "_http._tcp.", 80),
-                    DiscoveredService("DNS Gateway", "_domain._udp.", 53)
-                ),
-                openPorts = listOf(80, 443, 53),
-                responseTimeMs = 2L,
-                isReachable = true,
-                isGateway = true,
-                isSelf = false,
-                vendor = "ASUS Networks"
-            ),
-            LanDevice(
-                id = localIp,
-                ipAddress = localIp,
-                macAddress = "Self (Device Protected)",
-                hostName = "This Android Device",
-                deviceType = DeviceType.PHONE,
-                discoveredServices = listOf(
-                    DiscoveredService("GnuGuard Scanner Node", "_gnuguard._tcp.", 5353)
-                ),
-                responseTimeMs = 1L,
-                isReachable = true,
-                isGateway = false,
-                isSelf = true,
-                vendor = "Google Android"
-            ),
-            LanDevice(
-                id = "$prefix.112",
-                ipAddress = "$prefix.112",
-                macAddress = "Privacy Protected (Android 10+)",
-                hostName = "Pixel-9-Pro",
-                deviceType = DeviceType.PHONE,
-                discoveredServices = listOf(
-                    DiscoveredService("Nearby Share Service", "_nearby._tcp.", 4433)
-                ),
-                openPorts = emptyList(),
-                responseTimeMs = 9L,
-                isReachable = true,
-                isGateway = false,
-                isSelf = false,
-                vendor = "Google LLC"
-            ),
-            LanDevice(
-                id = "$prefix.145",
-                ipAddress = "$prefix.145",
-                macAddress = "Privacy Protected (iOS Device)",
-                hostName = "iPhone-16-Pro",
-                deviceType = DeviceType.PHONE,
-                discoveredServices = listOf(
-                    DiscoveredService("AirPlay Target", "_airplay._tcp.", 7000),
-                    DiscoveredService("Apple Mobile Sync", "_apple-mobdev2._tcp.", 62078)
-                ),
-                openPorts = listOf(62078),
-                responseTimeMs = 14L,
-                isReachable = true,
-                isGateway = false,
-                isSelf = false,
-                vendor = "Apple Inc."
-            ),
-            LanDevice(
-                id = "$prefix.188",
-                ipAddress = "$prefix.188",
-                macAddress = "E4:8D:8C:33:91:02",
-                hostName = "Living-Room-TV",
-                deviceType = DeviceType.SMART_TV_CAST,
-                discoveredServices = listOf(
-                    DiscoveredService("Chromecast Ultra 4K", "_googlecast._tcp.", 8009),
-                    DiscoveredService("Spotify Connect", "_spotify-connect._tcp.", 8000)
-                ),
-                openPorts = listOf(8008, 8009, 8000),
-                responseTimeMs = 6L,
-                isReachable = true,
-                isGateway = false,
-                isSelf = false,
-                vendor = "Sony Bravia"
-            ),
-            LanDevice(
-                id = "$prefix.204",
-                ipAddress = "$prefix.204",
-                macAddress = "00:11:32:9B:41:88",
-                hostName = "Synology-DiskStation",
-                deviceType = DeviceType.COMPUTER,
-                discoveredServices = listOf(
-                    DiscoveredService("DiskStation SMB", "_smb._tcp.", 445),
-                    DiscoveredService("DSM Web Admin", "_http._tcp.", 5000)
-                ),
-                openPorts = listOf(80, 443, 445, 5000, 22),
-                responseTimeMs = 3L,
-                isReachable = true,
-                isGateway = false,
-                isSelf = false,
-                vendor = "Synology Inc."
-            )
-        )
-    }
 }
