@@ -15,6 +15,7 @@ class NetworkUtilsTest {
     @Test
     fun enterpriseAndEnhancedOpenAreNotMisclassifiedAsOpen() {
         assertEquals(WifiSecurityType.EAP, NetworkUtils.parseSecurityType("[RSN-EAP-CCMP][ESS]"))
+        assertEquals(WifiSecurityType.EAP, NetworkUtils.parseSecurityType("[WPA2-EAP-CCMP][ESS]"))
         assertEquals(WifiSecurityType.OWE, NetworkUtils.parseSecurityType("[OWE][ESS]"))
     }
 
