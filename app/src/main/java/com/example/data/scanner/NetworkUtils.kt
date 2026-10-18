@@ -34,11 +34,11 @@ object NetworkUtils {
         if (capUpper.isBlank()) return WifiSecurityType.UNKNOWN
         return when {
             capUpper.contains("SAE") || capUpper.contains("WPA3") -> WifiSecurityType.WPA3_SAE
+            capUpper.contains("EAP") -> WifiSecurityType.EAP
+            capUpper.contains("OWE") -> WifiSecurityType.OWE
             capUpper.contains("WPA2-PSK") && capUpper.contains("WPA-PSK") -> WifiSecurityType.WPA_WPA2_MIXED
             capUpper.contains("WPA2") -> WifiSecurityType.WPA2_PSK
             capUpper.contains("WPA") -> WifiSecurityType.WPA_WPA2_MIXED
-            capUpper.contains("EAP") -> WifiSecurityType.EAP
-            capUpper.contains("OWE") -> WifiSecurityType.OWE
             capUpper.contains("WEP") -> WifiSecurityType.WEP
             capUpper.contains("ESS") || capUpper.contains("IBSS") -> WifiSecurityType.OPEN
             else -> WifiSecurityType.UNKNOWN
