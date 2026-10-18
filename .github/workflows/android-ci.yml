@@ -31,7 +31,8 @@ jobs:
             exit 1
           fi
           echo "$(dirname "$sdkmanager_path")" >> "$GITHUB_PATH"
-          yes | "$sdkmanager_path" --licenses || [ "$?" -eq 141 ]
+          set +o pipefail
+          yes | "$sdkmanager_path" --licenses
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
