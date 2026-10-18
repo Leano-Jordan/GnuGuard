@@ -31,6 +31,7 @@ object NetworkUtils {
 
     fun parseSecurityType(capabilities: String): WifiSecurityType {
         val capUpper = capabilities.uppercase()
+        if (capUpper.isBlank()) return WifiSecurityType.UNKNOWN
         return when {
             capUpper.contains("SAE") || capUpper.contains("WPA3") -> WifiSecurityType.WPA3_SAE
             capUpper.contains("WPA2-PSK") && capUpper.contains("WPA-PSK") -> WifiSecurityType.WPA_WPA2_MIXED
@@ -39,7 +40,7 @@ object NetworkUtils {
             capUpper.contains("EAP") -> WifiSecurityType.EAP
             capUpper.contains("OWE") -> WifiSecurityType.OWE
             capUpper.contains("WEP") -> WifiSecurityType.WEP
-            !capUpper.contains("WPA") && !capUpper.contains("WEP") -> WifiSecurityType.OPEN
+            capUpper.contains("ESS") || capUpper.contains("IBSS") -> WifiSecurityType.OPEN
             else -> WifiSecurityType.UNKNOWN
         }
     }
