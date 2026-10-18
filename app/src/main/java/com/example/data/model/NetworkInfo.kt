@@ -17,8 +17,8 @@ data class CurrentNetworkInfo(
 )
 
 data class NetworkSecurityAudit(
-    val score: Int = 100, // 0 - 100
-    val grade: String = "A+",
+    val score: Int = 0, // 0 - 100; zero is paired with UNKNOWN until evidence exists
+    val grade: String = "UNKNOWN",
     val findings: List<AuditFinding> = emptyList()
 )
 

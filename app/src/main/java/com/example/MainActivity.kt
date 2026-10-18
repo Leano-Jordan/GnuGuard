@@ -82,8 +82,12 @@ class MainActivity : FragmentActivity() {
 
     private fun triggerBiometricUnlock() {
         if (!viewModel.biometricAuthManager.canAuthenticate()) {
-            // If hardware / PIN is not enrolled, unlock directly
-            viewModel.unlockApp()
+            // Never bypass an enabled lock when device authentication is unavailable.
+            Toast.makeText(
+                this,
+                "Device authentication is unavailable. Set up a screen lock in Android Settings; GnuGuard will remain locked.",
+                Toast.LENGTH_LONG
+            ).show()
             return
         }
 
@@ -231,7 +235,17 @@ fun MainAppScaffold(
                     isBiometricEnabled = isBiometricEnabled,
                     autoScanInterval = autoScanInterval,
                     onThemeModeChanged = { viewModel.setThemeMode(it) },
-                    onBiometricToggle = { viewModel.setBiometricEnabled(it) },
+                    onBiometricToggle = { enabled ->
+                        if (enabled && !viewModel.biometricAuthManager.canAuthenticate()) {
+                            Toast.makeText(
+                                this,
+                                "Set up a biometric or device screen lock before enabling GnuGuard lock.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            viewModel.setBiometricEnabled(enabled)
+                        }
+                    },
                     onAutoScanIntervalChanged = { viewModel.setAutoScanInterval(it) },
                     onReplayOnboarding = { viewModel.resetOnboarding() },
                     onTestLock = onRequestLockPrompt

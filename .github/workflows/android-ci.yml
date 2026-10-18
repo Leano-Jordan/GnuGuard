@@ -1,0 +1,43 @@
+name: Android CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)"
+          if [ -z "$sdkmanager_path" ]; then
+            echo "Android SDK manager was not found under $sdk_root/cmdline-tools" >&2
+            exit 1
+          fi
+          echo "$(dirname "$sdkmanager_path")" >> "$GITHUB_PATH"
+          set +o pipefail
+          yes | "$sdkmanager_path" --licenses
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Run unit tests, lint, and debug build
+        run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug

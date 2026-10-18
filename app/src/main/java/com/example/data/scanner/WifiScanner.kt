@@ -42,7 +42,7 @@ class WifiScanner(private val context: Context) {
             var linkSpeed = 0
             var ipStr: String? = null
             var gatewayStr: String? = null
-            var subnetMask: String? = "255.255.255.0"
+            var subnetMask: String? = null
 
             val dhcpInfo = wifiManager?.dhcpInfo
             if (dhcpInfo != null && dhcpInfo.ipAddress != 0) {
@@ -78,7 +78,7 @@ class WifiScanner(private val context: Context) {
                 ssid = if (rawSsid != null && rawSsid != "<unknown ssid>" && rawSsid != "0x") {
                     rawSsid.removePrefix("\"").removeSuffix("\"")
                 } else {
-                    "Connected Network"
+                    null
                 }
                 bssid = connectionInfo.bssid
                 rssi = connectionInfo.rssi
@@ -87,30 +87,19 @@ class WifiScanner(private val context: Context) {
             }
 
             CurrentNetworkInfo(
-                isConnectedToWifi = isWifi || ipStr != null,
-                ssid = ssid ?: if (ipStr != null) "Local Wi-Fi Network" else "Not Connected",
-                bssid = bssid ?: "02:00:00:00:00:00",
-                localIpAddress = ipStr ?: "192.168.1.105",
-                subnetMask = subnetMask ?: "255.255.255.0",
-                subnetCidr = "/24",
-                gatewayIp = gatewayStr ?: "192.168.1.1",
-                linkSpeedMbps = if (linkSpeed > 0) linkSpeed else 433,
-                frequencyMhz = if (freq > 0) freq else 5180,
-                rssiDbm = if (rssi != 0) rssi else -52
+                isConnectedToWifi = isWifi,
+                ssid = ssid,
+                bssid = bssid,
+                localIpAddress = ipStr,
+                subnetMask = subnetMask,
+                subnetCidr = null,
+                gatewayIp = gatewayStr,
+                linkSpeedMbps = linkSpeed.coerceAtLeast(0),
+                frequencyMhz = freq.coerceAtLeast(0),
+                rssiDbm = rssi
             )
         } catch (e: Exception) {
-            CurrentNetworkInfo(
-                isConnectedToWifi = true,
-                ssid = "Wi-Fi Network",
-                bssid = "02:00:00:00:00:00",
-                localIpAddress = "192.168.1.100",
-                subnetMask = "255.255.255.0",
-                subnetCidr = "/24",
-                gatewayIp = "192.168.1.1",
-                linkSpeedMbps = 300,
-                frequencyMhz = 2437,
-                rssiDbm = -58
-            )
+            CurrentNetworkInfo(isConnectedToWifi = isWifiConnected())
         }
     }
 
@@ -158,7 +147,7 @@ class WifiScanner(private val context: Context) {
                             channel = channel,
                             band = band,
                             securityType = security,
-                            capabilities = sr.capabilities ?: "WPA2-PSK",
+                            capabilities = sr.capabilities ?: "",
                             standard = standard,
                             channelWidth = channelWidth,
                             isCurrentConnection = isConnected,
@@ -171,116 +160,14 @@ class WifiScanner(private val context: Context) {
                 }
             }
 
-            // If system returned empty (e.g. throttled or emulator), provide verified rich realistic environment scans
-            if (results.isEmpty()) {
-                results.addAll(generateRealisticScanResults(currentInfo))
-            }
         } catch (e: Exception) {
-            val currentInfo = getConnectedWifiInfo()
-            results.addAll(generateRealisticScanResults(currentInfo))
+            // Empty/unavailable scan results remain empty; never substitute synthetic networks.
         }
 
         // Sort: connected first, then highest signal (least negative RSSI)
         results.sortedWith(
             compareByDescending<WifiNetwork> { it.isCurrentConnection }
                 .thenByDescending { it.rssi }
-        )
-    }
-
-    private fun generateRealisticScanResults(currentInfo: CurrentNetworkInfo): List<WifiNetwork> {
-        return listOf(
-            WifiNetwork(
-                ssid = currentInfo.ssid ?: "GnuGuard-Secure-5G",
-                bssid = "34:2C:C4:8A:19:A0",
-                rssi = -42,
-                signalLevel = 4,
-                frequencyMhz = 5180,
-                channel = 36,
-                band = "5 GHz",
-                securityType = WifiSecurityType.WPA3_SAE,
-                capabilities = "[WPA3-SAE-CCMP][ESS][WPS]",
-                standard = "Wi-Fi 6 (802.11ax)",
-                channelWidth = "80 MHz",
-                isCurrentConnection = true,
-                ipAddress = currentInfo.localIpAddress ?: "192.168.1.105",
-                linkSpeedMbps = 866,
-                estimatedDistanceMeters = 2.4
-            ),
-            WifiNetwork(
-                ssid = "Office_Fleet_Corp",
-                bssid = "78:8A:20:1B:4F:92",
-                rssi = -55,
-                signalLevel = 4,
-                frequencyMhz = 5240,
-                channel = 48,
-                band = "5 GHz",
-                securityType = WifiSecurityType.WPA2_PSK,
-                capabilities = "[WPA2-PSK-CCMP][ESS][RSN]",
-                standard = "Wi-Fi 6 (802.11ax)",
-                channelWidth = "80 MHz",
-                isCurrentConnection = false,
-                estimatedDistanceMeters = 4.8
-            ),
-            WifiNetwork(
-                ssid = "CyberSecure_IoT_Mesh",
-                bssid = "00:1E:06:5D:88:2E",
-                rssi = -61,
-                signalLevel = 3,
-                frequencyMhz = 2437,
-                channel = 6,
-                band = "2.4 GHz",
-                securityType = WifiSecurityType.WPA2_PSK,
-                capabilities = "[WPA2-PSK-CCMP][ESS]",
-                standard = "Wi-Fi 4 (802.11n)",
-                channelWidth = "20 MHz",
-                isCurrentConnection = false,
-                estimatedDistanceMeters = 7.2
-            ),
-            WifiNetwork(
-                ssid = "Guest-Free-Public",
-                bssid = "9C:C9:EB:12:77:4A",
-                rssi = -68,
-                signalLevel = 3,
-                frequencyMhz = 2412,
-                channel = 1,
-                band = "2.4 GHz",
-                securityType = WifiSecurityType.OPEN,
-                capabilities = "[ESS]",
-                standard = "Wi-Fi 4 (802.11n)",
-                channelWidth = "20 MHz",
-                isCurrentConnection = false,
-                estimatedDistanceMeters = 11.5
-            ),
-            WifiNetwork(
-                ssid = "UltraNet-6E-Research",
-                bssid = "E4:8D:8C:33:91:AA",
-                rssi = -73,
-                signalLevel = 2,
-                frequencyMhz = 5975,
-                channel = 5,
-                band = "6 GHz",
-                securityType = WifiSecurityType.WPA3_SAE,
-                capabilities = "[WPA3-SAE-CCMP][OWE][ESS]",
-                standard = "Wi-Fi 6E (802.11ax)",
-                channelWidth = "160 MHz",
-                isCurrentConnection = false,
-                estimatedDistanceMeters = 14.1
-            ),
-            WifiNetwork(
-                ssid = "Legacy_Router_Backup",
-                bssid = "D8:0D:17:F4:5C:80",
-                rssi = -82,
-                signalLevel = 1,
-                frequencyMhz = 2462,
-                channel = 11,
-                band = "2.4 GHz",
-                securityType = WifiSecurityType.WEP,
-                capabilities = "[WEP][ESS]",
-                standard = "Legacy (802.11g)",
-                channelWidth = "20 MHz",
-                isCurrentConnection = false,
-                estimatedDistanceMeters = 22.0
-            )
         )
     }
 

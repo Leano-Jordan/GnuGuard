@@ -284,6 +284,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         var score = 100
 
         val currentWifi = wifis.find { it.isCurrentConnection }
+        if (currentWifi == null) {
+            score = 0
+            findings.add(
+                AuditFinding(
+                    title = "Current Wi-Fi security is unknown",
+                    description = "GnuGuard could not identify the active Wi-Fi network from available scan evidence, so it cannot assign a verified security grade.",
+                    severity = SecurityLevel.UNKNOWN,
+                    recommendation = "Check Wi-Fi permissions and scan availability, then scan again. Do not treat missing results as proof that the network is secure."
+                )
+            )
+        }
 
         if (currentWifi != null) {
             when (currentWifi.securityType) {
@@ -370,8 +381,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        val clampedScore = score.coerceIn(10, 100)
-        val grade = when {
+        val clampedScore = if (currentWifi == null) 0 else score.coerceIn(10, 100)
+        val grade = if (currentWifi == null) "UNKNOWN" else when {
             clampedScore >= 90 -> "A+"
             clampedScore >= 80 -> "A"
             clampedScore >= 70 -> "B"
