@@ -147,7 +147,7 @@ class WifiScanner(private val context: Context) {
                             channel = channel,
                             band = band,
                             securityType = security,
-                            capabilities = sr.capabilities ?: "WPA2-PSK",
+                            capabilities = sr.capabilities ?: "",
                             standard = standard,
                             channelWidth = channelWidth,
                             isCurrentConnection = isConnected,
